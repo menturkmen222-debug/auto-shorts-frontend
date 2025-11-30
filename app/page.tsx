@@ -1,240 +1,217 @@
-// app/page.tsx
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { FaUpload, FaCloud, FaClock, FaTrashAlt, FaQrcode } from "react-icons/fa";
+import { useEffect, useState } from 'react';
 
 const CHANNELS = [
-  { id: "channel_1", name: "Main YouTube" },
-  { id: "channel_2", name: "TikTok Daily" },
-  { id: "channel_3", name: "Reels Hub" },
-  { id: "channel_4", name: "Facebook Shorts" },
-  { id: "channel_5", name: "Cross-Post" },
+  { id: "tech_buni", name: "Tech Buni" },
+  { id: "cooking_buni", name: "Cooking Buni" },
+  { id: "travel_buni", name: "Travel Buni" },
+  { id: "gaming_buni", name: "Gaming Buni" },
+  { id: "life_buni", name: "Life Buni" },
 ];
 
-const PLATFORMS = [
-  { id: "youtube", name: "YouTube" },
-  { id: "tiktok", name: "TikTok" },
-  { id: "instagram", name: "Instagram" },
-  { id: "facebook", name: "Facebook" },
-];
+interface StatItem {
+  channelName: string;
+  pending: number;
+  uploaded: number;
+  failed: number;
+  todayUploaded: number;
+}
 
-export default function UploadPage() {
-  const [activeButton, setActiveButton] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{ success: boolean; message?: string; estTime?: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [prompt, setPrompt] = useState("");
-  const [channelId, setChannelId] = useState(CHANNELS[0].id);
-  const [platform, setPlatform] = useState(PLATFORMS[0].id);
-  const [scheduledAt, setScheduledAt] = useState("");
+export default function DashboardPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [stats, setStats] = useState<StatItem[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (err) {
+        console.error("Stat fetch error:", err);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!file || !prompt.trim()) return;
+    setIsSubmitting(true);
+    setMessage(null);
 
-    setIsUploading(true);
-    setUploadResult(null);
-
-    const formData = new FormData();
-    formData.append("video", file);
-    formData.append("prompt", prompt.trim());
-    formData.append("channelId", channelId);
-    formData.append("platform", platform);
-    if (scheduledAt) formData.append("scheduledAt", scheduledAt);
-
+    const formData = new FormData(e.currentTarget);
+    
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
+      const response = await fetch('https://<sizning-loyihangiz>.deno.dev/upload-video', {
+        method: 'POST',
         body: formData,
       });
-      const data = await res.json();
 
-      if (res.ok) {
-        setUploadResult({ success: true, message: "✅ Video queued successfully!", estTime: data.estDisplay });
-        // Tozalash
-        setPrompt("");
-        setFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+      const result = await response.json();
+
+      if (response.ok) {
+        setMessage({
+          type: 'success',
+          text: `✅ Video qabul qilindi! 4 ta tarmoqqa AQSH soatiga mos joylanadi.`,
+        });
+        e.currentTarget.reset();
+        const res = await fetch('/api/stats');
+        if (res.ok) setStats(await res.json());
       } else {
-        setUploadResult({ success: false, message: `❌ ${data.error || "Upload failed"}` });
+        throw new Error(result.error || 'Yuklashda xatolik');
       }
-    } catch (err) {
-      setUploadResult({ success: false, message: "❌ Network error. Please try again." });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: `❌ ${err.message}` });
     } finally {
-      setIsUploading(false);
+      setIsSubmitting(false);
     }
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files[0]) {
-      setFile(files[0]);
-    }
-  };
-
-  const handleButtonClick = (id: string) => {
-    if (activeButton === id) {
-      setActiveButton(null);
-    } else {
-      setActiveButton(id);
-    }
-  };
-
-  // Icon-only vertical button komponenti
-  const IconActionButton = ({ id, icon, label }: { id: string; icon: React.ReactNode; label: string }) => (
-    <motion.button
-      className={`flex items-center justify-center w-14 h-14 rounded-xl mb-3 shadow-md transition-colors ${
-        activeButton === id
-          ? "bg-blue-500 text-white"
-          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-      }`}
-      onClick={() => handleButtonClick(id)}
-      whileTap={{ scale: 0.95 }}
-      aria-label={label}
-    >
-      {icon}
-    </motion.button>
-  );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center">Auto-Upload Studio</h1>
+    <div style={{ maxWidth: '900px', margin: '1.5rem auto', padding: '0 16px' }}>
+      <h1 style={{ fontSize: '28px', fontWeight: '700', textAlign: 'center', marginBottom: '24px' }}>
+        AI Shorts Auto System
+      </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Chap tomon: Icon-only amal tugmalari (vertical) */}
-          <div className="flex flex-col items-center space-y-3">
-            <IconActionButton id="upload" icon={<FaUpload />} label="Upload" />
-            <IconActionButton id="cloud" icon={<FaCloud />} label="Cloudinary" />
-            <IconActionButton id="schedule" icon={<FaClock />} label="Schedule" />
-            <IconActionButton id="delete" icon={<FaTrashAlt />} label="Auto-Delete" />
-            <IconActionButton id="qr" icon={<FaQrcode />} label="QR Code" />
+      <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Yangi Video Yuklash</h2>
+        {message && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              background: message.type === 'success' ? '#d1fae5' : '#fee2e2',
+              color: message.type === 'success' ? '#065f46' : '#991b1b',
+              marginBottom: '16px',
+            }}
+          >
+            {message.text}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600' }}>Prompt *</label>
+            <textarea
+              name="prompt"
+              placeholder="Masalan: AI cooking in space kitchen"
+              required
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontFamily: 'inherit',
+              }}
+            />
           </div>
 
-          {/* O'ng tomon: Asosiy forma */}
-          <div className="lg:col-span-2">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6"
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600' }}>Kanal *</label>
+            <select
+              name="channelName"
+              required
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+              }}
             >
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Video yuklash */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Video File</label>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    required
-                    onChange={handleFileChange}
-                    ref={fileInputRef}
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent"
-                  />
-                  {file && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Selected: {file.name}</p>}
-                </div>
-
-                {/* Prompt */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">AI Prompt (min. 10 chars)</label>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    required
-                    minLength={10}
-                    placeholder="Describe the video content for AI metadata generation..."
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-gray-100"
-                    rows={3}
-                  />
-                </div>
-
-                {/* Platform & Channel */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Platform</label>
-                    <select
-                      value={platform}
-                      onChange={(e) => setPlatform(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent"
-                    >
-                      {PLATFORMS.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Channel</label>
-                    <select
-                      value={channelId}
-                      onChange={(e) => setChannelId(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent"
-                    >
-                      {CHANNELS.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Scheduling (optional) */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Schedule (Optional – Up to 10 days ahead, AQSH EST time)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    ⏰ Videos auto-scheduled to optimal US hours: 6AM, 10AM, 2PM, 6PM, 10PM EST
-                  </p>
-                </div>
-
-                {/* Submit */}
-                <button
-                  type="submit"
-                  disabled={isUploading || !file || prompt.trim().length < 10}
-                  className={`w-full py-3 rounded-xl font-semibold transition ${
-                    isUploading
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
-                >
-                  {isUploading ? "Processing..." : "Queue Video"}
-                </button>
-
-                {/* Natija */}
-                <AnimatePresence>
-                  {uploadResult && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className={`p-4 rounded-lg mt-4 ${
-                        uploadResult.success
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
-                      }`}
-                    >
-                      <p>{uploadResult.message}</p>
-                      {uploadResult.estTime && (
-                        <p className="text-sm mt-1">⏰ Scheduled for: {uploadResult.estTime} (EST)</p>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </form>
-            </motion.div>
+              <option value="">Tanlang...</option>
+              {CHANNELS.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
-        </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+              Video fayl yoki URL *
+            </label>
+            <input
+              type="file"
+              name="video"
+              accept="video/*"
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                marginBottom: '8px',
+              }}
+            />
+            <input
+              type="url"
+              name="videoUrl"
+              placeholder="Yoki video URL (https://...)"
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+              }}
+            />
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              Fayl yoki URL dan bittasini kiriting.
+            </p>
+          </div>
+
+          <p style={{ fontSize: '13px', color: '#4b5563', fontStyle: 'italic' }}>
+            🕒 Video avtomatik ravishda AQSH auditoriyasi uchun optimal soatlarga (6 AM, 10 AM, 2 PM, 6 PM, 10 PM EST) moslab, 4 ta tarmoqqa joylanadi.
+          </p>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              padding: '10px 16px',
+              background: isSubmitting ? '#93c5fd' : '#3b82f6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSubmitting ? 'Yuborilmoqda...' : 'Videoni Yuklash'}
+          </button>
+        </form>
+      </div>
+
+      <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Kanal Statistikasi</h2>
+        {loadingStats ? (
+          <p style={{ textAlign: 'center', color: '#6b7280' }}>Yuklanmoqda...</p>
+        ) : stats.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#6b7280' }}>Ma'lumot yo'q.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: '16px' }}>
+            {stats.map((item, i) => (
+              <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
+                <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '8px' }}>
+                  {CHANNELS.find(c => c.id === item.channelName)?.name}
+                </div>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '14px' }}>
+                  <span>⏳ Navbatda: <b>{item.pending}</b></span>
+                  <span>✅ Yuklangan: <b>{item.uploaded}</b></span>
+                  <span>❌ Xatolik: <b>{item.failed}</b></span>
+                  <span>📅 Bugun: <b>{item.todayUploaded}/5</b></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
