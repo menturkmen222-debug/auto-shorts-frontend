@@ -2,7 +2,7 @@
 export async function GET() {
   try {
     // Sizning Deno Deploy backendingizga so'rov
-    const res = await fetch('https://auto-shorts-system.deno.dev/api/stats', {
+    const res = await fetch('https://tm-auto.deno.dev/api/stats', {
       next: { revalidate: 15 }, // 15 soniyada yangilanadi
     });
 
