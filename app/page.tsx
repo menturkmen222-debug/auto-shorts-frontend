@@ -51,7 +51,7 @@ export default function DashboardPage() {
     const formData = new FormData(e.currentTarget);
     
     try {
-      const response = await fetch('https://<sizning-loyihangiz>.deno.dev/upload-video', {
+      const response = await fetch('https://tm-auto.deno.dev/upload-video', {
         method: 'POST',
         body: formData,
       });
