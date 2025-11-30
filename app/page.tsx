@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 
-// Platforma va kanal ma'lumotlari
 const PLATFORMS = [
   { id: 'youtube', name: 'YouTube' },
   { id: 'tiktok', name: 'TikTok' },
@@ -18,14 +17,13 @@ const CHANNELS = [
   { id: 'channel_5', name: 'Kanal 5' },
 ];
 
-// Statistika turi
 interface StatItem {
   platform: string;
   channelId: string;
   pending: number;
   uploaded: number;
   failed: number;
-  todayUploaded: number; // bugun yuklangan
+  todayUploaded: number;
 }
 
 export default function DashboardPage() {
@@ -34,7 +32,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<StatItem[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
 
-  // Statistikani yuklash
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -44,13 +41,13 @@ export default function DashboardPage() {
           setStats(data);
         }
       } catch (err) {
-        console.error("Statistika yuklanmadi:", err);
+        console.error("Stat fetch error:", err);
       } finally {
         setLoadingStats(false);
       }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 15000); // 15 soniyada yangilanadi
+    const interval = setInterval(fetchStats, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -62,7 +59,7 @@ export default function DashboardPage() {
     const formData = new FormData(e.currentTarget);
     
     try {
-      const response = await fetch('https://auto-shorts-system.deno.dev/upload-video', {
+      const response = await fetch('https://<sizning-loyihangiz>.deno.dev/upload-video', {
         method: 'POST',
         body: formData,
       });
@@ -72,17 +69,17 @@ export default function DashboardPage() {
       if (response.ok) {
         setMessage({
           type: 'success',
-          text: `✅ Video qabul qilindi! Avtomatik ravishda AQSH soatiga mos vaqtga joylanadi.`,
+          text: `✅ Video qabul qilindi! Avtomatik AQSH soatiga mos vaqtga joylanadi.`,
         });
         e.currentTarget.reset();
-        // Statistikani darhol yangilash
+        // Statni darhol yangilash
         const res = await fetch('/api/stats');
         if (res.ok) setStats(await res.json());
       } else {
         throw new Error(result.error || 'Yuklashda xatolik');
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: `❌ Xato: ${err.message}` });
+      setMessage({ type: 'error', text: `❌ ${err.message}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -94,7 +91,6 @@ export default function DashboardPage() {
         AI Shorts Auto System
       </h1>
 
-      {/* Forma */}
       <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Yangi Video Yuklash</h2>
         {message && (
@@ -132,7 +128,7 @@ export default function DashboardPage() {
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600' }}>Prompt *</label>
             <textarea
               name="prompt"
-              placeholder="Masalan: AI-generated cooking tutorial with futuristic kitchen"
+              placeholder="Masalan: AI cooking in space kitchen"
               required
               rows={3}
               style={{
@@ -185,9 +181,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ❌ SANA TANLASH YO'Q — avtomatik! */}
           <p style={{ fontSize: '13px', color: '#4b5563', fontStyle: 'italic' }}>
-            🕒 Video avtomatik ravishda AQSH auditoriyasi uchun optimal soatlarga (6 AM, 10 AM, 2 PM, 6 PM, 10 PM EST) joylanadi.
+            🕒 Yuklanish vaqti avtomatik AQSH auditoriyasi uchun optimal soatlarga moslanadi.
           </p>
 
           <button
@@ -208,18 +203,16 @@ export default function DashboardPage() {
         </form>
       </div>
 
-      {/* Dashboard */}
       <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Kanal Statistikasi</h2>
-
         {loadingStats ? (
-          <p style={{ textAlign: 'center', color: '#6b7280' }}>Statistika yuklanmoqda...</p>
+          <p style={{ textAlign: 'center', color: '#6b7280' }}>Yuklanmoqda...</p>
         ) : stats.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#6b7280' }}>Hali ma'lumot yo'q.</p>
+          <p style={{ textAlign: 'center', color: '#6b7280' }}>Ma'lumot yo'q.</p>
         ) : (
           <div style={{ display: 'grid', gap: '16px' }}>
-            {stats.map((item, idx) => (
-              <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
+            {stats.map((item, i) => (
+              <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
                 <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '8px' }}>
                   {PLATFORMS.find(p => p.id === item.platform)?.name} — {CHANNELS.find(c => c.id === item.channelId)?.name}
                 </div>
