@@ -18,20 +18,12 @@ interface StatItem {
   todayUploaded: number;
 }
 
-interface UploadProgress {
-  id: string;
-  filename: string;
-  status: 'uploading' | 'success' | 'failed' | 'retrying';
-  message?: string;
-}
-
 export default function DashboardPage() {
-  const [uploads, setUploads] = useState<UploadProgress[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [stats, setStats] = useState<StatItem[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
-  let uploadId = 0;
 
-  // Statistika yuklash
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -47,49 +39,30 @@ export default function DashboardPage() {
       }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 10000);
+    const interval = setInterval(fetchStats, 15000);
     return () => clearInterval(interval);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setMessage(null);
+
     const formData = new FormData(e.currentTarget);
     const videoFile = formData.get("video") as File;
     const videoUrl = formData.get("videoUrl")?.toString().trim() || "";
-    const prompt = formData.get("prompt")?.toString() || "";
-    const channelName = formData.get("channelName")?.toString() || "";
 
-    if (!prompt || !channelName) {
-      alert("Prompt va kanal majburiy");
-      return;
-    }
-
+    // Validatsiya: fayl yoki URL dan kamida bittasi bo'lishi kerak
     if (!videoFile?.name && !videoUrl) {
-      alert("Fayl yoki URL kiriting");
+      setMessage({ type: 'error', text: '❌ Video fayl yoki URL kiriting.' });
+      setIsSubmitting(false);
       return;
     }
 
-    const id = `upload-${uploadId++}`;
-    const filename = videoFile?.name || (videoUrl ? "URL video" : "Unknown");
-
-    setUploads(prev => [...prev, { id, filename, status: 'uploading' }]);
-
-    try {
-      if (videoFile?.name) {
-        await uploadFile(id, videoFile, prompt, channelName);
-      } else if (videoUrl) {
-        await uploadByUrl(id, videoUrl, prompt, channelName);
-      }
-    } catch (err: any) {
-      setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'failed', message: err.message } : u));
+    // URL bo'sh joyni olib tashlash
+    if (videoUrl) {
+      formData.set("videoUrl", videoUrl);
     }
-  };
-
-  const uploadFile = async (id: string, file: File, prompt: string, channelName: string) => {
-    const formData = new FormData();
-    formData.append("video", file);
-    formData.append("prompt", prompt);
-    formData.append("channelName", channelName);
 
     try {
       const response = await fetch('https://autotm.deno.dev/upload-video', {
@@ -97,60 +70,25 @@ export default function DashboardPage() {
         body: formData,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Yuklashda xatolik');
+      const result = await response.json();
+
+      if (response.ok) {
+        setMessage({
+          type: 'success',
+          text: `✅ Video qabul qilindi! 4 ta tarmoqqa AQSH soatiga mos joylanadi.`,
+        });
+        // ✅ Xavfsiz forma tozalash
+        (e.target as HTMLFormElement).reset();
+        // Statistika yangilanishi
+        const res = await fetch('/api/stats');
+        if (res.ok) setStats(await res.json());
+      } else {
+        throw new Error(result.error || 'Yuklashda xatolik');
       }
-
-      setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'success' } : u));
-
-      const res = await fetch('/api/stats');
-      if (res.ok) setStats(await res.json());
     } catch (err: any) {
-      // Retry logic
-      setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'retrying' } : u));
-      setTimeout(async () => {
-        try {
-          const retryRes = await fetch('https://autotm.deno.dev/upload-video', {
-            method: 'POST',
-            body: formData,
-          });
-          if (retryRes.ok) {
-            setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'success' } : u));
-            const res = await fetch('/api/stats');
-            if (res.ok) setStats(await res.json());
-          } else {
-            throw new Error('Retry ham xato berdi');
-          }
-        } catch (retryErr: any) {
-          setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'failed', message: retryErr.message } : u));
-        }
-      }, 2000);
-    }
-  };
-
-  const uploadByUrl = async (id: string, url: string, prompt: string, channelName: string) => {
-    const formData = new FormData();
-    formData.append("videoUrl", url);
-    formData.append("prompt", prompt);
-    formData.append("channelName", channelName);
-
-    try {
-      const res = await fetch('https://autotm.deno.dev/upload-video', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
-      }
-
-      setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'success' } : u));
-      const statRes = await fetch('/api/stats');
-      if (statRes.ok) setStats(await statRes.json());
-    } catch (err: any) {
-      setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'failed', message: err.message } : u));
+      setMessage({ type: 'error', text: `❌ ${err.message}` });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -160,32 +98,21 @@ export default function DashboardPage() {
         AI Shorts Auto System
       </h1>
 
-      {/* Real-time Upload Monitoring */}
-      {uploads.length > 0 && (
-        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
-          <h3 style={{ fontWeight: '600', marginBottom: '12px' }}>Yuklanayotgan videolar</h3>
-          {uploads.map(upload => (
-            <div key={upload.id} style={{ marginBottom: '12px', padding: '12px', background: '#dbeafe', borderRadius: '8px' }}>
-              <div style={{ fontWeight: '600', fontSize: '14px' }}>{upload.filename}</div>
-              {upload.status === 'uploading' && (
-                <div style={{ fontSize: '13px', color: '#1e40af', marginTop: '4px' }}>Yuklanmoqda...</div>
-              )}
-              {upload.status === 'retrying' && (
-                <div style={{ fontSize: '13px', color: '#b45309', marginTop: '4px' }}>Qayta urinilmoqda...</div>
-              )}
-              {upload.status === 'success' && (
-                <div style={{ fontSize: '13px', color: '#047857', marginTop: '4px' }}>✅ Muvaffaqiyatli!</div>
-              )}
-              {upload.status === 'failed' && (
-                <div style={{ fontSize: '13px', color: '#b91c1c', marginTop: '4px' }}>❌ Xato: {upload.message}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
       <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Yangi Video Yuklash</h2>
+        {message && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              background: message.type === 'success' ? '#d1fae5' : '#fee2e2',
+              color: message.type === 'success' ? '#065f46' : '#991b1b',
+              marginBottom: '16px',
+            }}
+          >
+            {message.text}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
@@ -225,7 +152,9 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600' }}>Video fayl yoki URL *</label>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600' }}>
+              Video fayl yoki URL *
+            </label>
             <input
               type="file"
               name="video"
@@ -241,7 +170,7 @@ export default function DashboardPage() {
             <input
               type="url"
               name="videoUrl"
-              placeholder="Yoki video URL (https://drive.google.com/uc?export=download&id=...)"
+              placeholder="Yoki video URL (masalan: https://drive.google.com/uc?export=download&id=...)"
               style={{
                 width: '100%',
                 padding: '8px',
@@ -260,23 +189,24 @@ export default function DashboardPage() {
 
           <button
             type="submit"
+            disabled={isSubmitting}
             style={{
               padding: '10px 16px',
-              background: '#3b82f6',
+              background: isSubmitting ? '#93c5fd' : '#3b82f6',
               color: '#fff',
               border: 'none',
               borderRadius: '6px',
               fontWeight: '600',
-              cursor: 'pointer',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
             }}
           >
-            Videoni Yuklash
+            {isSubmitting ? 'Yuborilmoqda...' : 'Videoni Yuklash'}
           </button>
         </form>
       </div>
 
       <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Kanal Statistikasi (Real-Time)</h2>
+        <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>Kanal Statistikasi</h2>
         {loadingStats ? (
           <p style={{ textAlign: 'center', color: '#6b7280' }}>Yuklanmoqda...</p>
         ) : stats.length === 0 ? (
@@ -301,4 +231,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
+                  }
