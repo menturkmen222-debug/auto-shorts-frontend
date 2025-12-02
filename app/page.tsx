@@ -49,7 +49,21 @@ export default function DashboardPage() {
     setMessage(null);
 
     const formData = new FormData(e.currentTarget);
-    
+    const videoFile = formData.get("video") as File;
+    const videoUrl = formData.get("videoUrl")?.toString().trim() || "";
+
+    // Validatsiya: fayl yoki URL dan kamida bittasi bo'lishi kerak
+    if (!videoFile?.name && !videoUrl) {
+      setMessage({ type: 'error', text: '❌ Video fayl yoki URL kiriting.' });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // URL bo'sh joyni olib tashlash
+    if (videoUrl) {
+      formData.set("videoUrl", videoUrl);
+    }
+
     try {
       const response = await fetch('https://autotm.deno.dev/upload-video', {
         method: 'POST',
@@ -63,7 +77,9 @@ export default function DashboardPage() {
           type: 'success',
           text: `✅ Video qabul qilindi! 4 ta tarmoqqa AQSH soatiga mos joylanadi.`,
         });
-        e.currentTarget.reset();
+        // ✅ Xavfsiz forma tozalash
+        (e.target as HTMLFormElement).reset();
+        // Statistika yangilanishi
         const res = await fetch('/api/stats');
         if (res.ok) setStats(await res.json());
       } else {
@@ -154,7 +170,7 @@ export default function DashboardPage() {
             <input
               type="url"
               name="videoUrl"
-              placeholder="Yoki video URL (https://...)"
+              placeholder="Yoki video URL (masalan: https://drive.google.com/uc?export=download&id=...)"
               style={{
                 width: '100%',
                 padding: '8px',
@@ -163,7 +179,7 @@ export default function DashboardPage() {
               }}
             />
             <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-              Fayl yoki URL dan bittasini kiriting.
+              Fayl yoki URL dan bittasini kiriting. Google Drive uchun "uc?export=download&id=..." formatidan foydalaning.
             </p>
           </div>
 
@@ -215,4 +231,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
+                  }
