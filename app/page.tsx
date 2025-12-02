@@ -116,7 +116,7 @@ export default function DashboardPage() {
 
       setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'success' } : u));
 
-      // Statistika yangilash
+      // Statistika yangilash 
       const res = await fetch('/api/stats');
       if (res.ok) setStats(await res.json());
 
