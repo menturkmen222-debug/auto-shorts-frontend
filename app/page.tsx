@@ -92,7 +92,7 @@ export default function DashboardPage() {
     formData.append("channelName", channelName);
 
     try {
-      const response = await fetch('https://autotm.deno.dev/upload-video', {
+      const response = await fetch('https://autodz.tkmjoker89.workers.dev/upload-video', {
         method: 'POST',
         body: formData,
       });
@@ -111,7 +111,7 @@ export default function DashboardPage() {
       setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'retrying' } : u));
       setTimeout(async () => {
         try {
-          const retryRes = await fetch('https://autotm.deno.dev/upload-video', {
+          const retryRes = await fetch('https://autodz.tkmjoker89.workers.dev/upload-video', {
             method: 'POST',
             body: formData,
           });
@@ -136,7 +136,7 @@ export default function DashboardPage() {
     formData.append("channelName", channelName);
 
     try {
-      const res = await fetch('https://autotm.deno.dev/upload-video', {
+      const res = await fetch('https://autodz.tkmjoker89.workers.dev/upload-video', {
         method: 'POST',
         body: formData,
       });
